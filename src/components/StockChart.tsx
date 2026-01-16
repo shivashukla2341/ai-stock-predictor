@@ -10,56 +10,99 @@ import {
   ReferenceLine,
 } from "recharts";
 
+interface HistoricalDataPoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 interface StockChartProps {
   symbol: string;
   currentPrice: number;
   predictedPrice: number;
+  historicalData?: HistoricalDataPoint[];
 }
 
-const StockChart = ({ symbol, currentPrice, predictedPrice }: StockChartProps) => {
+const StockChart = ({ symbol, currentPrice, predictedPrice, historicalData }: StockChartProps) => {
   const data = useMemo(() => {
-    const points = [];
-    const startPrice = currentPrice * 0.95;
-    const volatility = currentPrice * 0.02;
+    const points: { day: number; price?: number; predicted?: number; type: string; date?: string }[] = [];
     
-    // Generate historical data (past 30 days)
-    for (let i = 0; i < 30; i++) {
-      const progress = i / 30;
-      const trend = (currentPrice - startPrice) * progress;
-      const noise = (Math.random() - 0.5) * volatility;
-      points.push({
-        day: i + 1,
-        price: startPrice + trend + noise,
-        type: "historical",
+    if (historicalData && historicalData.length > 0) {
+      // Use real historical data
+      historicalData.forEach((point, index) => {
+        points.push({
+          day: index + 1,
+          price: point.close,
+          type: "historical",
+          date: point.date,
+        });
       });
-    }
-    
-    // Add current price
-    points.push({
-      day: 31,
-      price: currentPrice,
-      type: "current",
-    });
-    
-    // Generate prediction data (next 7 days)
-    for (let i = 1; i <= 7; i++) {
-      const progress = i / 7;
-      const trend = (predictedPrice - currentPrice) * progress;
-      const noise = (Math.random() - 0.5) * volatility * 0.5;
+      
+      // Add current price
+      const lastDay = points.length;
       points.push({
-        day: 31 + i,
-        price: currentPrice + trend + noise,
-        predicted: currentPrice + trend + noise,
-        type: "prediction",
+        day: lastDay + 1,
+        price: currentPrice,
+        type: "current",
       });
+      
+      // Generate prediction data (next 7 days)
+      const volatility = currentPrice * 0.01;
+      for (let i = 1; i <= 7; i++) {
+        const progress = i / 7;
+        const trend = (predictedPrice - currentPrice) * progress;
+        const noise = (Math.random() - 0.5) * volatility * 0.5;
+        points.push({
+          day: lastDay + 1 + i,
+          predicted: currentPrice + trend + noise,
+          type: "prediction",
+        });
+      }
+    } else {
+      // Fallback to generated data
+      const startPrice = currentPrice * 0.95;
+      const volatility = currentPrice * 0.02;
+      
+      for (let i = 0; i < 30; i++) {
+        const progress = i / 30;
+        const trend = (currentPrice - startPrice) * progress;
+        const noise = (Math.random() - 0.5) * volatility;
+        points.push({
+          day: i + 1,
+          price: startPrice + trend + noise,
+          type: "historical",
+        });
+      }
+      
+      points.push({
+        day: 31,
+        price: currentPrice,
+        type: "current",
+      });
+      
+      for (let i = 1; i <= 7; i++) {
+        const progress = i / 7;
+        const trend = (predictedPrice - currentPrice) * progress;
+        const noise = (Math.random() - 0.5) * volatility * 0.5;
+        points.push({
+          day: 31 + i,
+          predicted: currentPrice + trend + noise,
+          type: "prediction",
+        });
+      }
     }
     
     return points;
-  }, [currentPrice, predictedPrice]);
+  }, [currentPrice, predictedPrice, historicalData]);
 
   const isBullish = predictedPrice >= currentPrice;
-  const minPrice = Math.min(...data.map(d => d.price || d.predicted || 0)) * 0.98;
-  const maxPrice = Math.max(...data.map(d => d.price || d.predicted || 0)) * 1.02;
+  const allValues = data.map(d => d.price ?? d.predicted ?? 0);
+  const minPrice = Math.min(...allValues) * 0.98;
+  const maxPrice = Math.max(...allValues) * 1.02;
+  const todayIndex = data.findIndex(d => d.type === "current");
 
   return (
     <div className="glass-card p-6 animate-fade-in">
@@ -110,9 +153,13 @@ const StockChart = ({ symbol, currentPrice, predictedPrice }: StockChartProps) =
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => {
-                if (value === 1) return "30d ago";
-                if (value === 31) return "Today";
-                if (value === 38) return "+7d";
+                const point = data.find(d => d.day === value);
+                if (point?.type === "current") return "Today";
+                if (point?.date) {
+                  const date = new Date(point.date);
+                  return `${date.getMonth() + 1}/${date.getDate()}`;
+                }
+                if (value === data.length) return "+7d";
                 return "";
               }}
             />
@@ -133,10 +180,15 @@ const StockChart = ({ symbol, currentPrice, predictedPrice }: StockChartProps) =
               }}
               labelStyle={{ color: "hsl(215, 20%, 55%)" }}
               formatter={(value: number) => [`$${value.toFixed(2)}`, "Price"]}
-              labelFormatter={(label) => `Day ${label}`}
+              labelFormatter={(label) => {
+                const point = data.find(d => d.day === label);
+                if (point?.date) return point.date;
+                if (point?.type === "current") return "Today";
+                return `Day ${label}`;
+              }}
             />
             <ReferenceLine
-              x={31}
+              x={todayIndex + 1}
               stroke="hsl(173, 80%, 50%)"
               strokeDasharray="5 5"
               strokeOpacity={0.5}

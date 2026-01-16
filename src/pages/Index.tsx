@@ -1,59 +1,13 @@
-import { useState } from "react";
 import { Brain, TrendingUp, Shield, Zap, LineChart, Clock } from "lucide-react";
 import Header from "@/components/Header";
 import StockSearch from "@/components/StockSearch";
 import PredictionCard from "@/components/PredictionCard";
 import StockChart from "@/components/StockChart";
 import FeatureCard from "@/components/FeatureCard";
-
-interface PredictionData {
-  symbol: string;
-  currentPrice: number;
-  predictedPrice: number;
-  confidence: number;
-  timeframe: string;
-}
-
-// Mock stock data for demo purposes
-const mockStockData: Record<string, { price: number }> = {
-  AAPL: { price: 178.52 },
-  GOOGL: { price: 141.80 },
-  MSFT: { price: 378.91 },
-  TSLA: { price: 248.50 },
-  NVDA: { price: 495.22 },
-  AMZN: { price: 178.25 },
-  META: { price: 505.75 },
-  NFLX: { price: 628.40 },
-};
+import { useStockData } from "@/hooks/useStockData";
 
 const Index = () => {
-  const [prediction, setPrediction] = useState<PredictionData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSearch = async (symbol: string) => {
-    setIsLoading(true);
-    
-    // Simulate AI prediction delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    const stockData = mockStockData[symbol] || { price: 100 + Math.random() * 400 };
-    const currentPrice = stockData.price;
-    
-    // Generate mock prediction (random but realistic)
-    const changePercent = (Math.random() - 0.4) * 15; // Slight bullish bias
-    const predictedPrice = currentPrice * (1 + changePercent / 100);
-    const confidence = Math.floor(70 + Math.random() * 25);
-    
-    setPrediction({
-      symbol,
-      currentPrice,
-      predictedPrice,
-      confidence,
-      timeframe: "7 Days",
-    });
-    
-    setIsLoading(false);
-  };
+  const { prediction, isLoading, fetchStockData } = useStockData();
 
   const features = [
     {
@@ -111,7 +65,7 @@ const Index = () => {
             Get data-driven insights for smarter investment decisions.
           </p>
           
-          <StockSearch onSearch={handleSearch} isLoading={isLoading} />
+          <StockSearch onSearch={fetchStockData} isLoading={isLoading} />
         </section>
 
         {/* Prediction Results */}
@@ -122,6 +76,7 @@ const Index = () => {
               symbol={prediction.symbol}
               currentPrice={prediction.currentPrice}
               predictedPrice={prediction.predictedPrice}
+              historicalData={prediction.historicalData}
             />
           </section>
         )}
@@ -152,8 +107,8 @@ const Index = () => {
         <section className="text-center">
           <div className="glass-card p-6 max-w-2xl mx-auto">
             <p className="text-sm text-muted-foreground">
-              <strong className="text-foreground">Disclaimer:</strong> This is a demo application. 
-              Stock predictions are simulated and should not be used for real investment decisions. 
+              <strong className="text-foreground">Disclaimer:</strong> This application uses real market data from Alpha Vantage. 
+              Stock predictions are algorithmic projections and should not be used for real investment decisions. 
               Always consult with a qualified financial advisor before making investment choices.
             </p>
           </div>
